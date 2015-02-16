@@ -1,3 +1,4 @@
+from collections import Counter
 import webapp2
 from google.appengine.api import urlfetch
 
@@ -19,6 +20,7 @@ from ws import ws
 import cloudstorage as gcs
 
 
+# TODO see http://www.tripadvisor.com/robots.txt
 # Retry can help overcome transient urlfetch or GCS issues, such as timeouts.
 my_default_retry_params = gcs.RetryParams(initial_delay=0.2,
                                           max_delay=5.0,
@@ -46,7 +48,7 @@ class Crawler(webapp2.RequestHandler):
             except Exception, err:
                 logging.error(Exception)
                 logging.error(err)
-                
+
         return f
 
     def getUrl(self, url, callback):
@@ -65,7 +67,13 @@ class Crawler(webapp2.RequestHandler):
         raise NotImplementedError("Implement this method")
 
     seen = set()
-    seen_pages_limit = 500
+    seen_domains = Counter()
+    seen_pages_limit = 50000
+    seen_domain_pages_limit = 30
+
+    def get_domain(self, url):
+        return urllib2.splithost(url[url.find('://') + 1:])
+
     def bfs(self, current_url):
         '''
         calls process for each page in the site
@@ -74,31 +82,41 @@ class Crawler(webapp2.RequestHandler):
         try:
             result = urlfetch.fetch(current_url)
 
-            while result.status_code == 200:
+            if result.status_code == 200:
                 soup = BeautifulSoup(result.content)
 
-                if self.isItem(soup, current_url):
+                if self.is_item(soup, current_url):
                     self.process(soup, current_url)
 
                 self.seen.add(current_url)
+                host = self.get_domain(current_url)
+                self.seen_domains[host] += 1
                 #find new links
                 for link in soup.find_all('a'):
                     new_url = link.get('href')
+                    links_host = self.get_domain(new_url)
+
                     #todo improve performance with custom url exclusions
-                    if new_url not in self.seen and len(self.seen) < self.seen_pages_limit:
+                    if new_url not in self.seen and len(self.seen) < self.seen_pages_limit and \
+                            self.seen_domains[links_host] < self.seen_domain_pages_limit:
                         deferred.defer(self.bfs, new_url)
 
         except Exception, err:
             print Exception, err
 
+
+    def get(self):
+        self.go()
+
     def go(self):
         deferred.defer(self.bfs, self.site_url)
 
     def getDescription(self, soup):
+        description = False
         try:
             description = soup.find('meta', attrs={'property' : "og:description"}).get('content')
         except Exception, err:
-            pass   
+            pass
         if not description:
             description = soup.find('meta', attrs={'name' : "description"}).get('content')
         return description
@@ -107,26 +125,32 @@ class Crawler(webapp2.RequestHandler):
         try:
             image_url = soup.find('meta', attrs={'property' : "og:image"}).get('content')
         except Exception, err:
-            pass   
+            pass
         if not image_url:
             image_url = soup.find('img').get('src')
 
         # if image_url:
         #     #TODO save image
         # return image
-    
+
 
     def getTitle(self, soup):
         return soup.title.name
 
+    def is_item(self, soup, current_url):
+        return True
+
+
+class TestCrawler(Crawler):
+    def __init__(self):
+        super(TestCrawler, self).__init__()
+        self.site_url = 'localhost:5000'
 
 class MochiGamesCrawler(Crawler):
     '''
     does everything manually doesnt do much using crawler
     '''
-    def get(self):
-        # deferred.defer(self.go)
-        self.go()
+
 
     def go(self):
         url = "http://feedmonger.mochimedia.com/feeds/query/?q=search%3Aword&partner_id=1e74098ab3d64da0&limit=1000"
@@ -135,7 +159,7 @@ class MochiGamesCrawler(Crawler):
 
     def callback(self, result):
         # ndb.delete_multi(Game.query().fetch(999999, keys_only=True))
-        
+
         data = json.loads(result.content)
         games = data['games']
         gamesmodels = []
@@ -161,8 +185,8 @@ class MochiGamesCrawler(Crawler):
             for i in range(len(thumbnail_urls)):
                 deferred.defer(uploadGameThumbTask, thumbnail_urls[i], gamesmodels[i].urltitle)
                 deferred.defer(uploadGameSWFTask, swf_urls[i], gamesmodels[i].urltitle)
-            
-         
+
+
 
 def getContentType(image):
     if image.format == images.JPEG:
@@ -217,6 +241,6 @@ def uploadGameThumbTask(url, title):
 
 def uploadGameSWFTask(url, title):
     saveUrl(url, WORD_GAMES_SWF_BUCKET + title)
-   
+
 
 
