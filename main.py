@@ -338,6 +338,11 @@ class TagHandler(BaseHandler):
         }
         self.render('/templates/tag.jinja2', extraParams)
 
+class TestHandler(BaseHandler):
+    def get(self):
+        test_crawler = Crawler()
+        test_crawler.site_url = 'http://localhost:5000'
+        test_crawler.go()
 
 class LogoutHandler(BaseHandler):
     def get(self):
@@ -378,7 +383,7 @@ app = ndb.toplevel(webapp2.WSGIApplication([
                                                ('/contact', ContactHandler),
                                                ('/game/(.*)', GameHandler),
                                                ('/games/(.*)', TagHandler),
-                                               ('/gotest', TestCrawler),
+                                               ('/gotest', TestHandler),
                                                ('/loadgames', LoadGamesHandler),
                                                ('/sitemap', SitemapHandler),
 

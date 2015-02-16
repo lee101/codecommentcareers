@@ -1,4 +1,5 @@
 from collections import Counter
+import re
 import webapp2
 from google.appengine.api import urlfetch
 
@@ -13,7 +14,7 @@ import logging
 
 from Models import *
 import awgutils
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 
 from ws import ws
 
@@ -92,6 +93,7 @@ class Crawler(webapp2.RequestHandler):
                 host = self.get_domain(current_url)
                 self.seen_domains[host] += 1
                 #find new links
+                new_urls = []
                 for link in soup.find_all('a'):
                     new_url = link.get('href')
                     links_host = self.get_domain(new_url)
@@ -99,8 +101,9 @@ class Crawler(webapp2.RequestHandler):
                     #todo improve performance with custom url exclusions
                     if new_url not in self.seen and len(self.seen) < self.seen_pages_limit and \
                             self.seen_domains[links_host] < self.seen_domain_pages_limit:
-                        deferred.defer(self.bfs, new_url)
-
+                        new_urls.append(new_url)
+                for url in new_urls:
+                    self.bfs(url)
         except Exception, err:
             print Exception, err
 
@@ -109,7 +112,7 @@ class Crawler(webapp2.RequestHandler):
         self.go()
 
     def go(self):
-        deferred.defer(self.bfs, self.site_url)
+        self.bfs(self.site_url)
 
     def getDescription(self, soup):
         description = False
@@ -140,11 +143,35 @@ class Crawler(webapp2.RequestHandler):
     def is_item(self, soup, current_url):
         return True
 
+job_posting_words = {
+    'job': 0.5,
+    'taleo': 1,
+    'career': 1,
+    'apply': 0.5,
+    'team': 0.5,
+    'join': 0.5,
+    'you': 0.2,
+    'planet': 0.2,
+    'email': 0.2,
+    'visit': 0.2,
+    'hi': 0.2,
+    'best': 0.2,
+    'awesome': 0.2,
+    'developer': 0.2,
+    'seo': 0.2,
+    'hacker': 0.2,
+    'coder': 0.2,
 
-class TestCrawler(Crawler):
-    def __init__(self):
-        super(TestCrawler, self).__init__()
-        self.site_url = 'localhost:5000'
+}
+class CodeCommentCrawler(Crawler):
+    def get_job_posting(self, comments):
+        for comment in comments:
+            for word in re.split('\s*', comment):
+
+
+    def process(self, soup, url):
+        comments = soup.findAll(text=lambda text: isinstance(text, Comment))
+
 
 class MochiGamesCrawler(Crawler):
     '''

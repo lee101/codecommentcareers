@@ -1,7 +1,9 @@
 import unittest
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
+from google.appengine.ext.deferred import deferred
 from crawlers import *
+from crawlers.crawlers import Crawler
 
 
 class CrawlerTests(unittest.TestCase):
@@ -17,13 +19,13 @@ class CrawlerTests(unittest.TestCase):
         self.testbed.deactivate()
 
     def testWordGamesCrawler(self):
-        word_games_crawler = WordGamesCrawler()
+        word_games_crawler = Crawler()
         word_games_crawler.seen_pages_limit = 20
+        word_games_crawler.site_url = 'localhost:5000'
         word_games_crawler.go()
         # Get the task out of the queue
         tasks = self.taskqueue_stub.get_filtered_tasks()
         # Run the task
         task = tasks[0]
         deferred.run(task.payload)
-        
-        
+
