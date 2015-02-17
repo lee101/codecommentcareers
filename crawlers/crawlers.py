@@ -6,6 +6,7 @@ from google.appengine.api import urlfetch
 from google.appengine.api import images
 from google.appengine.ext import deferred
 from google.appengine.runtime import DeadlineExceededError
+from collections import defaultdict
 
 import urllib2
 
@@ -131,10 +132,8 @@ class Crawler(webapp2.RequestHandler):
             pass
         if not image_url:
             image_url = soup.find('img').get('src')
+        return image_url
 
-        # if image_url:
-        #     #TODO save image
-        # return image
 
 
     def getTitle(self, soup):
@@ -143,7 +142,7 @@ class Crawler(webapp2.RequestHandler):
     def is_item(self, soup, current_url):
         return True
 
-job_posting_words = {
+job_posting_words = defaultdict(int, {
     'job': 0.5,
     'taleo': 1,
     'career': 1,
@@ -170,15 +169,41 @@ job_posting_words = {
     'hacker': 0.2,
     'coder': 0.2,
 
-}
+})
+
+
+
+
 class CodeCommentCrawler(Crawler):
-    def get_job_posting(self, comments):
+    def get_company_name(self, soup, url):
+
+        title = soup.title.name
+        urllib2.splithost(re.replace(r'', '', url)
+
+        # collapse title find the hostname and map it back
+
+
+    def get_job_posting(self, soup, url):
+        comments = soup.findAll(text=lambda text: isinstance(text, Comment))
+        total_probability = 0
+        comments_probabilitys = []
         for comment in comments:
-            for word in re.split('\s*', comment):
+            comments_probability = 0
+            for word in re.split(r'[\s\.@]*', comment):
+                comments_probability += job_posting_words[word]
+            total_probability += comments_probability
+            comments_probabilitys.append(comments_probability)
+
+        if total_probability > 1:
+            job_posting = JobPosting()
+            job_posting.title = self.getTitle(soup)
+            job_posting.description = self.getDescription(soup)
+
+
 
 
     def process(self, soup, url):
-        comments = soup.findAll(text=lambda text: isinstance(text, Comment))
+        self.get_job_posting(soup, url)
 
 
 class MochiGamesCrawler(Crawler):
