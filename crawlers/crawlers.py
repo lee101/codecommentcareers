@@ -178,7 +178,7 @@ class CodeCommentCrawler(Crawler):
     def get_company_name(self, soup, url):
 
         title = soup.title.name
-        urllib2.splithost(re.replace(r'', '', url)
+        urllib2.splithost(re.replace(r'', '', url))
 
         # collapse title find the hostname and map it back
 
