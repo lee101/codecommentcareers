@@ -1,25 +1,21 @@
 from collections import Counter
 import re
-import webapp2
-from google.appengine.api import urlfetch
-
-from google.appengine.api import images
-from google.appengine.ext import deferred
-from google.appengine.runtime import DeadlineExceededError
 from collections import defaultdict
-
 import urllib2
-
 import json
 import logging
+
+import webapp2
+from google.appengine.api import urlfetch
+from google.appengine.api import images
+from google.appengine.ext import deferred
 
 from Models import *
 import awgutils
 from bs4 import BeautifulSoup, Comment
-
 from ws import ws
-
 import cloudstorage as gcs
+
 
 
 # TODO see http://www.tripadvisor.com/robots.txt
@@ -42,7 +38,6 @@ WORD_GAMES_SWF_BUCKET = '/games.addictingwordgames.com/'
 
 
 class Crawler(webapp2.RequestHandler):
-
     def create_callback(self, callback, rpc):
         def f():
             try:
@@ -93,7 +88,7 @@ class Crawler(webapp2.RequestHandler):
                 self.seen.add(current_url)
                 host = self.get_domain(current_url)
                 self.seen_domains[host] += 1
-                #find new links
+                # find new links
                 new_urls = []
                 for link in soup.find_all('a'):
                     new_url = link.get('href')
@@ -101,7 +96,7 @@ class Crawler(webapp2.RequestHandler):
 
                     #todo improve performance with custom url exclusions
                     if new_url not in self.seen and len(self.seen) < self.seen_pages_limit and \
-                            self.seen_domains[links_host] < self.seen_domain_pages_limit:
+                                    self.seen_domains[links_host] < self.seen_domain_pages_limit:
                         new_urls.append(new_url)
                 for url in new_urls:
                     self.bfs(url)
@@ -118,16 +113,16 @@ class Crawler(webapp2.RequestHandler):
     def getDescription(self, soup):
         description = False
         try:
-            description = soup.find('meta', attrs={'property' : "og:description"}).get('content')
+            description = soup.find('meta', attrs={'property': "og:description"}).get('content')
         except Exception, err:
             pass
         if not description:
-            description = soup.find('meta', attrs={'name' : "description"}).get('content')
+            description = soup.find('meta', attrs={'name': "description"}).get('content')
         return description
 
     def getImage(self, soup):
         try:
-            image_url = soup.find('meta', attrs={'property' : "og:image"}).get('content')
+            image_url = soup.find('meta', attrs={'property': "og:image"}).get('content')
         except Exception, err:
             pass
         if not image_url:
@@ -135,12 +130,12 @@ class Crawler(webapp2.RequestHandler):
         return image_url
 
 
-
     def getTitle(self, soup):
-        return soup.title.name
+        return soup.title.text
 
     def is_item(self, soup, current_url):
         return True
+
 
 job_posting_words = defaultdict(int, {
     'job': 0.5,
@@ -172,15 +167,33 @@ job_posting_words = defaultdict(int, {
 })
 
 
-
-
 class CodeCommentCrawler(Crawler):
+    def get_interesting_level_domain(self, url):
+        host = urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
+        return host.split('.')[0]
+
     def get_company_name(self, soup, url):
 
-        title = soup.title.name
-        urllib2.splithost(re.replace(r'', '', url))
+        title = soup.title.text
+        host = self.get_interesting_level_domain(url)
 
         # collapse title find the hostname and map it back
+        collapsed_word_indexes = []
+        i = 0
+        for letter in title:
+            if re.match(r'\s', letter):
+                i += 1
+                continue
+            collapsed_word_indexes.append(i)
+            i += 1
+        collapsed_title = re.sub(r'\s*', '', title)
+        start_idx = collapsed_title.find(host)
+        if start_idx == -1:
+            return None
+        end_idx = start_idx + len(host) - 1
+        maped_start_idx = collapsed_word_indexes[start_idx]
+        maped_end_idx = collapsed_word_indexes[end_idx]
+        return title[maped_start_idx: maped_end_idx + 1].title()
 
 
     def get_job_posting(self, soup, url):
@@ -200,8 +213,6 @@ class CodeCommentCrawler(Crawler):
             job_posting.description = self.getDescription(soup)
 
 
-
-
     def process(self, soup, url):
         self.get_job_posting(soup, url)
 
@@ -214,7 +225,7 @@ class MochiGamesCrawler(Crawler):
 
     def go(self):
         url = "http://feedmonger.mochimedia.com/feeds/query/?q=search%3Aword&partner_id=1e74098ab3d64da0&limit=1000"
-        #self.getUrl(url, self.callback)
+        # self.getUrl(url, self.callback)
         self.callback(urlfetch.fetch(url))
 
     def callback(self, result):
@@ -236,7 +247,7 @@ class MochiGamesCrawler(Crawler):
             g.instructions = game['instructions']
             g.width = int(game['width'])
             g.height = int(game['height'])
-            ##get image from
+            # #get image from
             gamesmodels.append(g)
             thumbnail_urls.append(game['thumbnail_url'])
             swf_urls.append(game['swf_url'])
@@ -245,7 +256,6 @@ class MochiGamesCrawler(Crawler):
             for i in range(len(thumbnail_urls)):
                 deferred.defer(uploadGameThumbTask, thumbnail_urls[i], gamesmodels[i].urltitle)
                 deferred.defer(uploadGameSWFTask, swf_urls[i], gamesmodels[i].urltitle)
-
 
 
 def getContentType(image):
@@ -257,6 +267,7 @@ def getContentType(image):
         return 'image/bmp'
     elif image.format == images.GIF:
         return 'image/gif'
+
 
 def saveImage(url, title):
     '''
@@ -276,6 +287,7 @@ def saveImage(url, title):
         return image.width, image.height
     return (0, 0)
 
+
 def saveUrl(url, title):
     '''
     saves object at url in cloud storage
@@ -294,10 +306,12 @@ def saveUrl(url, title):
         gcs_file.write(response.content)
         gcs_file.close()
 
+
 def uploadGameThumbTask(url, title):
     g = Game.oneByUrlTitle(title)
     g.imgwidth, g.imgheight = saveImage(url, IMG_BUCKET + title)
     g.put()
+
 
 def uploadGameSWFTask(url, title):
     saveUrl(url, WORD_GAMES_SWF_BUCKET + title)
