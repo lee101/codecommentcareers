@@ -4,8 +4,8 @@ trees."""
 from bs4.testing import SoupTest, HTMLTreeBuilderSmokeTest
 from bs4.builder import HTMLParserTreeBuilder
 
-
 class HTMLParserTreeBuilderSmokeTest(SoupTest, HTMLTreeBuilderSmokeTest):
+
     @property
     def default_builder(self):
         return HTMLParserTreeBuilder()

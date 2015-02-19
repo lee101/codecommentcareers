@@ -1,7 +1,9 @@
 """Helper classes for tests."""
 
 import copy
+import functools
 import unittest
+from unittest import TestCase
 from bs4 import BeautifulSoup
 from bs4.element import (
     CharsetMetaAttributeValue,
@@ -9,14 +11,14 @@ from bs4.element import (
     ContentMetaAttributeValue,
     Doctype,
     SoupStrainer,
-    )
+)
 
 from bs4.builder import HTMLParserTreeBuilder
-
 default_builder = HTMLParserTreeBuilder
 
 
 class SoupTest(unittest.TestCase):
+
     @property
     def default_builder(self):
         return default_builder()
@@ -43,6 +45,7 @@ class SoupTest(unittest.TestCase):
 
 
 class HTMLTreeBuilderSmokeTest(object):
+
     """A basic test of a treebuilder's competence.
 
     Any HTML treebuilder, present or future, should be able to pass
@@ -77,6 +80,11 @@ class HTMLTreeBuilderSmokeTest(object):
         self.assertDoctypeHandled("html")
         self.assertDoctypeHandled(
             'html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"')
+
+    def test_empty_doctype(self):
+        soup = self.soup("<!DOCTYPE>")
+        doctype = soup.contents[0]
+        self.assertEqual("", doctype.strip())
 
     def test_public_doctype_with_url(self):
         doctype = 'html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"'
@@ -156,6 +164,12 @@ class HTMLTreeBuilderSmokeTest(object):
         comment = soup.find(text="foobar")
         self.assertEqual(comment.__class__, Comment)
 
+        # The comment is properly integrated into the tree.
+        foo = soup.find(text="foo")
+        self.assertEqual(comment, foo.next_element)
+        baz = soup.find(text="baz")
+        self.assertEqual(comment, baz.previous_element)
+
     def test_preserved_whitespace_in_pre_and_textarea(self):
         """Whitespace must be preserved in <pre> and <textarea> tags."""
         self.assertSoupEquals("<pre>   </pre>")
@@ -214,12 +228,14 @@ class HTMLTreeBuilderSmokeTest(object):
         expect = u'<p id="pi\N{LATIN SMALL LETTER N WITH TILDE}ata"></p>'
         self.assertSoupEquals('<p id="pi&#241;ata"></p>', expect)
         self.assertSoupEquals('<p id="pi&#xf1;ata"></p>', expect)
+        self.assertSoupEquals('<p id="pi&#Xf1;ata"></p>', expect)
         self.assertSoupEquals('<p id="pi&ntilde;ata"></p>', expect)
 
     def test_entities_in_text_converted_to_unicode(self):
         expect = u'<p>pi\N{LATIN SMALL LETTER N WITH TILDE}ata</p>'
         self.assertSoupEquals("<p>pi&#241;ata</p>", expect)
         self.assertSoupEquals("<p>pi&#xf1;ata</p>", expect)
+        self.assertSoupEquals("<p>pi&#Xf1;ata</p>", expect)
         self.assertSoupEquals("<p>pi&ntilde;ata</p>", expect)
 
     def test_quot_entity_converted_to_quotation_mark(self):
@@ -231,6 +247,12 @@ class HTMLTreeBuilderSmokeTest(object):
         self.assertSoupEquals("&#10000000000000;", expect)
         self.assertSoupEquals("&#x10000000000000;", expect)
         self.assertSoupEquals("&#1000000000;", expect)
+
+    def test_multipart_strings(self):
+        "Mostly to prevent a recurrence of a bug in the html5lib treebuilder."
+        soup = self.soup("<html><h2>\nfoo</h2><p></p></html>")
+        self.assertEqual("p", soup.h2.string.next_element.name)
+        self.assertEqual("p", soup.p.name)
 
     def test_basic_namespaces(self):
         """Parsers don't need to *understand* namespaces, but at the
@@ -258,6 +280,14 @@ class HTMLTreeBuilderSmokeTest(object):
     # weird, so we run these tests separately for every tree builder
     # to detect any differences between them.
     #
+
+    def test_can_parse_unicode_document(self):
+        # A seemingly innocuous document... but it's in Unicode! And
+        # it contains characters that can't be represented in the
+        # encoding found in the  declaration! The horror!
+        markup = u'<html><head><meta encoding="euc-jp"></head><body>Sacr\N{LATIN SMALL LETTER E WITH ACUTE} bleu!</body>'
+        soup = self.soup(markup)
+        self.assertEqual(u'Sacr\xe9 bleu!', soup.body.string)
 
     def test_soupstrainer(self):
         """Parsers should be able to work with SoupStrainers."""
@@ -382,9 +412,9 @@ class HTMLTreeBuilderSmokeTest(object):
 
         # Here's a document incorporating that meta tag.
         shift_jis_html = (
-                             '<html><head>\n%s\n'
-                             '<meta http-equiv="Content-language" content="ja"/>'
-                             '</head><body>Shift-JIS markup goes here.') % meta_tag
+            '<html><head>\n%s\n'
+            '<meta http-equiv="Content-language" content="ja"/>'
+            '</head><body>Shift-JIS markup goes here.') % meta_tag
         soup = self.soup(shift_jis_html)
 
         # Parse the document, and the charset is seemingly unaffected.
@@ -409,9 +439,9 @@ class HTMLTreeBuilderSmokeTest(object):
 
         # Here's a document incorporating that meta tag.
         shift_jis_html = (
-                             '<html><head>\n%s\n'
-                             '<meta http-equiv="Content-language" content="ja"/>'
-                             '</head><body>Shift-JIS markup goes here.') % meta_tag
+            '<html><head>\n%s\n'
+            '<meta http-equiv="Content-language" content="ja"/>'
+            '</head><body>Shift-JIS markup goes here.') % meta_tag
         soup = self.soup(shift_jis_html)
 
         # Parse the document, and the charset is seemingly unaffected.
@@ -431,8 +461,8 @@ class HTMLTreeBuilderSmokeTest(object):
         data.a['foo'] = 'bar'
         self.assertEqual('<a foo="bar">text</a>', data.a.decode())
 
-
 class XMLTreeBuilderSmokeTest(object):
+
     def test_docstring_generated(self):
         soup = self.soup("<root/>")
         self.assertEqual(
@@ -450,6 +480,23 @@ class XMLTreeBuilderSmokeTest(object):
         self.assertEqual(
             soup.encode("utf-8"), markup)
 
+    def test_formatter_processes_script_tag_for_xml_documents(self):
+        doc = """
+  <script type="text/javascript">
+  </script>
+"""
+        soup = BeautifulSoup(doc, "xml")
+        # lxml would have stripped this while parsing, but we can add
+        # it later.
+        soup.script.string = 'console.log("< < hey > > ");'
+        encoded = soup.encode()
+        self.assertTrue(b"&lt; &lt; hey &gt; &gt;" in encoded)
+
+    def test_can_parse_unicode_document(self):
+        markup = u'<?xml version="1.0" encoding="euc-jp"><root>Sacr\N{LATIN SMALL LETTER E WITH ACUTE} bleu!</root>'
+        soup = self.soup(markup)
+        self.assertEqual(u'Sacr\xe9 bleu!', soup.root.string)
+
     def test_popping_namespaced_tag(self):
         markup = '<rss xmlns:dc="foo"><dc:creator>b</dc:creator><dc:date>2012-07-02T20:33:42Z</dc:date><dc:rights>c</dc:rights><image>d</image></rss>'
         soup = self.soup(markup)
@@ -465,7 +512,7 @@ class XMLTreeBuilderSmokeTest(object):
     def test_large_xml_document(self):
         """A large XML document should come out the same as it went in."""
         markup = (b'<?xml version="1.0" encoding="utf-8"?>\n<root>'
-                  + b'0' * (2 ** 12)
+                  + b'0' * (2**12)
                   + b'</root>')
         soup = self.soup(markup)
         self.assertEqual(soup.encode("utf-8"), markup)
@@ -492,6 +539,10 @@ class XMLTreeBuilderSmokeTest(object):
         soup = self.soup(markup)
         self.assertEqual(unicode(soup.foo), markup)
 
+    def test_namespaced_attributes_xml_namespace(self):
+        markup = '<foo xml:lang="fr">bar</foo>'
+        soup = self.soup(markup)
+        self.assertEqual(unicode(soup.foo), markup)
 
 class HTML5TreeBuilderSmokeTest(HTMLTreeBuilderSmokeTest):
     """Smoke test for a tree builder that supports HTML5."""
@@ -521,15 +572,21 @@ class HTML5TreeBuilderSmokeTest(HTMLTreeBuilderSmokeTest):
         self.assertEqual(namespace, soup.math.namespace)
         self.assertEqual(namespace, soup.msqrt.namespace)
 
+    def test_xml_declaration_becomes_comment(self):
+        markup = '<?xml version="1.0" encoding="utf-8"?><html></html>'
+        soup = self.soup(markup)
+        self.assertTrue(isinstance(soup.contents[0], Comment))
+        self.assertEqual(soup.contents[0], '?xml version="1.0" encoding="utf-8"?')
+        self.assertEqual("html", soup.contents[0].next_element.name)
 
 def skipIf(condition, reason):
-    def nothing(test, *args, **kwargs):
-        return None
+   def nothing(test, *args, **kwargs):
+       return None
 
-    def decorator(test_item):
-        if condition:
-            return nothing
-        else:
-            return test_item
+   def decorator(test_item):
+       if condition:
+           return nothing
+       else:
+           return test_item
 
-    return decorator
+   return decorator

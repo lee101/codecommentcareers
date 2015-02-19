@@ -7,11 +7,10 @@ from bs4.builder import (
     builder_registry as registry,
     HTMLParserTreeBuilder,
     TreeBuilderRegistry,
-    )
+)
 
 try:
     from bs4.builder import HTML5TreeBuilder
-
     HTML5LIB_PRESENT = True
 except ImportError:
     HTML5LIB_PRESENT = False
@@ -21,7 +20,6 @@ try:
         LXMLTreeBuilderForXML,
         LXMLTreeBuilder,
         )
-
     LXML_PRESENT = True
 except ImportError:
     LXML_PRESENT = False
@@ -39,10 +37,10 @@ class BuiltInRegistryTest(unittest.TestCase):
             self.assertEqual(registry.lookup('permissive', 'xml'),
                              LXMLTreeBuilderForXML)
         self.assertEqual(registry.lookup('strict', 'html'),
-                         HTMLParserTreeBuilder)
+                          HTMLParserTreeBuilder)
         if HTML5LIB_PRESENT:
             self.assertEqual(registry.lookup('html5lib', 'html'),
-                             HTML5TreeBuilder)
+                              HTML5TreeBuilder)
 
     def test_lookup_by_markup_type(self):
         if LXML_PRESENT:
@@ -63,10 +61,10 @@ class BuiltInRegistryTest(unittest.TestCase):
                              LXMLTreeBuilder)
         if HTML5LIB_PRESENT:
             self.assertEqual(registry.lookup('html5lib'),
-                             HTML5TreeBuilder)
+                              HTML5TreeBuilder)
 
         self.assertEqual(registry.lookup('html.parser'),
-                         HTMLParserTreeBuilder)
+                          HTMLParserTreeBuilder)
 
     def test_beautifulsoup_constructor_does_lookup(self):
         # You can pass in a string.
@@ -79,7 +77,6 @@ class BuiltInRegistryTest(unittest.TestCase):
         self.assertRaises(ValueError, BeautifulSoup,
                           "", features="no-such-feature")
 
-
 class RegistryTest(unittest.TestCase):
     """Test the TreeBuilderRegistry class in general."""
 
@@ -88,7 +85,7 @@ class RegistryTest(unittest.TestCase):
 
     def builder_for_features(self, *feature_list):
         cls = type('Builder_' + '_'.join(feature_list),
-                   (object,), {'features': feature_list})
+                   (object,), {'features' : feature_list})
 
         self.registry.register(cls)
         return cls
@@ -132,11 +129,11 @@ class RegistryTest(unittest.TestCase):
         # There are two builders featuring 'foo' and 'bar', but
         # the one that also features 'quux' was registered later.
         self.assertEqual(self.registry.lookup('foo', 'bar'),
-                         has_both_late)
+                          has_both_late)
 
         # There is only one builder featuring 'foo', 'bar', and 'baz'.
         self.assertEqual(self.registry.lookup('foo', 'bar', 'baz'),
-                         has_both_early)
+                          has_both_early)
 
     def test_lookup_fails_when_cannot_reconcile_requested_features(self):
         builder1 = self.builder_for_features('foo', 'bar')
