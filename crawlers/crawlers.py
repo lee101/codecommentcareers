@@ -13,8 +13,10 @@ from google.appengine.ext import deferred
 from Models import *
 import awgutils
 from bs4 import BeautifulSoup, Comment
+import fixtures
 from ws import ws
 import cloudstorage as gcs
+
 
 
 
@@ -94,7 +96,7 @@ class Crawler(webapp2.RequestHandler):
                     new_url = link.get('href')
                     links_host = self.get_domain(new_url)
 
-                    #todo improve performance with custom url exclusions
+                    # todo improve performance with custom url exclusions
                     if new_url not in self.seen and len(self.seen) < self.seen_pages_limit and \
                                     self.seen_domains[links_host] < self.seen_domain_pages_limit:
                         new_urls.append(new_url)
@@ -144,6 +146,9 @@ job_posting_words = defaultdict(int, {
     'apply': 0.5,
     'team': 0.5,
     'join': 0.5,
+    'work': 0.5,
+    'company': 0.2,
+    'technology': 0.2,
     'you': 0.2,
     'planet': 0.2,
     'email': 0.2,
@@ -168,8 +173,14 @@ job_posting_words = defaultdict(int, {
 
 
 class CodeCommentCrawler(Crawler):
+    def get_host(self, url):
+        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
+
+    def get_path(self, url):
+        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[1]
+
     def get_interesting_level_domain(self, url):
-        host = urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
+        host = self.get_host(url)
         return host.split('.')[0]
 
     def get_company_name(self, soup, url):
@@ -197,7 +208,8 @@ class CodeCommentCrawler(Crawler):
 
 
     def get_job_posting(self, soup, url):
-        comments = soup.findAll(text=lambda text: isinstance(text, Comment))
+        comments = soup.find_all(text=lambda text: isinstance(text, Comment))
+        print comments
         total_probability = 0
         comments_probabilitys = []
         for comment in comments:
@@ -206,11 +218,30 @@ class CodeCommentCrawler(Crawler):
                 comments_probability += job_posting_words[word]
             total_probability += comments_probability
             comments_probabilitys.append(comments_probability)
-
+        print 'total prob', total_probability
         if total_probability > 1:
+            job_post_start_idx = 0
+            job_post_end_idx = len(comments_probabilitys) - 1
+            for i in xrange(len(comments_probabilitys)):
+                if comments_probabilitys[i]:
+                    job_post_start_idx = i
+                    break
+            for i in xrange(len(comments_probabilitys) - 1, -1, -1):
+                if comments_probabilitys[i]:
+                    job_post_end_idx = i
+                    break
+            code_comment = comments[job_post_end_idx: job_post_end_idx + 1]
+
             job_posting = JobPosting()
             job_posting.title = self.getTitle(soup)
-            job_posting.description = self.getDescription(soup)
+            job_posting.urltitle = awgutils.urlEncode(job_posting.title)
+            job_posting.company_name = self.get_company_name(soup, url)
+            job_posting.company_url = url.replace(self.get_path(url), '')
+            job_posting.company_image_url = self.getImage(soup)
+            job_posting.code_comment = code_comment
+            job_posting.code_comment_url = url
+            job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
+            job_posting.put()
 
 
     def process(self, soup, url):

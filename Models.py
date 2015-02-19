@@ -4,14 +4,11 @@ from google.appengine.ext import ndb
 class JobPosting(ndb.Model):
     title = ndb.StringProperty()
     urltitle = ndb.StringProperty()
-    description = ndb.TextProperty()
     company_name = ndb.TextProperty()
     company_url = ndb.TextProperty()
     company_image_url = ndb.TextProperty()
     code_comment = ndb.TextProperty()
     code_comment_url = ndb.TextProperty()
-    imgwidth = ndb.IntegerProperty()
-    imgheight = ndb.IntegerProperty()
     tags = ndb.StringProperty(repeated=True)
 
     @classmethod

@@ -2,6 +2,7 @@ import unittest
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 from google.appengine.ext.deferred import deferred
+from Models import JobPosting
 from bs4 import BeautifulSoup
 from crawlers import *
 from crawlers.crawlers import Crawler, CodeCommentCrawler
@@ -19,10 +20,10 @@ class CrawlerTests(unittest.TestCase):
     def tearDown(self):
         self.testbed.deactivate()
 
-    def testWordGamesCrawler(self):
+    def test_crawler(self):
         word_games_crawler = CodeCommentCrawler()
         word_games_crawler.seen_pages_limit = 20
-        word_games_crawler.site_url = 'localhost:5000'
+        word_games_crawler.site_url = 'http://localhost:5000'
         word_games_crawler.go()
 
     def test_get_company_name(self):
@@ -42,7 +43,18 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(company_name, 'Awesome Company Name')
 
 
+    def test_processing_code_comment(self):
+        with open('tests/test_job_posting.html') as f:
+            posting = f.read(999999)
+        soup = BeautifulSoup(posting)
+        word_games_crawler = CodeCommentCrawler()
+        url = 'https://www.awesomecompanyname.com'
+        word_games_crawler.process(soup, url)
+        job_postings = JobPosting().query().fetch(5)
+        self.assertEqual(len(job_postings), 1)
 
+        self.assertEqual(set(job_postings.tags), {'html', 'css', 'bootstrap'})
+        self.assertEqual(job_postings.code_comment_url, url)
 
 
 
