@@ -35,7 +35,7 @@ my_default_retry_params = gcs.RetryParams(initial_delay=0.2,
 # retry_params here only for demo purposes.
 gcs.set_default_retry_params(my_default_retry_params)
 
-IMG_BUCKET = '/wordgames/'
+IMG_BUCKET = '/commentcareers/'
 WORD_GAMES_SWF_BUCKET = '/games.addictingwordgames.com/'
 
 
@@ -93,6 +93,7 @@ class Crawler(webapp2.RequestHandler):
                 # find new links
                 new_urls = []
                 for link in soup.find_all('a'):
+                    #todo href is not a url
                     new_url = link.get('href')
                     links_host = self.get_domain(new_url)
 
@@ -123,12 +124,16 @@ class Crawler(webapp2.RequestHandler):
         return description
 
     def getImage(self, soup):
+        image_url = None
         try:
             image_url = soup.find('meta', attrs={'property': "og:image"}).get('content')
         except Exception, err:
             pass
         if not image_url:
-            image_url = soup.find('img').get('src')
+            try:
+                image_url = soup.find('img').get('src')
+            except AttributeError, err:
+                pass
         return image_url
 
 
@@ -208,8 +213,7 @@ class CodeCommentCrawler(Crawler):
 
 
     def get_job_posting(self, soup, url):
-        comments = soup.find_all(text=lambda text: isinstance(text, Comment))
-        print comments
+        comments = soup.find_all(text=lambda text: text.output_ready().startswith('<!--'))
         total_probability = 0
         comments_probabilitys = []
         for comment in comments:
@@ -218,7 +222,6 @@ class CodeCommentCrawler(Crawler):
                 comments_probability += job_posting_words[word]
             total_probability += comments_probability
             comments_probabilitys.append(comments_probability)
-        print 'total prob', total_probability
         if total_probability > 1:
             job_post_start_idx = 0
             job_post_end_idx = len(comments_probabilitys) - 1
@@ -230,7 +233,7 @@ class CodeCommentCrawler(Crawler):
                 if comments_probabilitys[i]:
                     job_post_end_idx = i
                     break
-            code_comment = comments[job_post_end_idx: job_post_end_idx + 1]
+            code_comment = '\n'.join(comments[job_post_start_idx: job_post_end_idx + 1])
 
             job_posting = JobPosting()
             job_posting.title = self.getTitle(soup)
@@ -248,45 +251,6 @@ class CodeCommentCrawler(Crawler):
         self.get_job_posting(soup, url)
 
 
-class MochiGamesCrawler(Crawler):
-    '''
-    does everything manually doesnt do much using crawler
-    '''
-
-
-    def go(self):
-        url = "http://feedmonger.mochimedia.com/feeds/query/?q=search%3Aword&partner_id=1e74098ab3d64da0&limit=1000"
-        # self.getUrl(url, self.callback)
-        self.callback(urlfetch.fetch(url))
-
-    def callback(self, result):
-        # ndb.delete_multi(Game.query().fetch(999999, keys_only=True))
-
-        data = json.loads(result.content)
-        games = data['games']
-        gamesmodels = []
-        thumbnail_urls = []
-        swf_urls = []
-        for game in games:
-            g = Game()
-            g.title = game['name'][:500]
-            g.urltitle = awgutils.urlEncode(g.title)
-            if Game.oneByUrlTitle(g.urltitle):
-                continue;
-            g.description = game['description']
-            g.tags = map(awgutils.urlEncode, game['tags'])
-            g.instructions = game['instructions']
-            g.width = int(game['width'])
-            g.height = int(game['height'])
-            # #get image from
-            gamesmodels.append(g)
-            thumbnail_urls.append(game['thumbnail_url'])
-            swf_urls.append(game['swf_url'])
-        ndb.put_multi(gamesmodels)
-        if not ws.debug:
-            for i in range(len(thumbnail_urls)):
-                deferred.defer(uploadGameThumbTask, thumbnail_urls[i], gamesmodels[i].urltitle)
-                deferred.defer(uploadGameSWFTask, swf_urls[i], gamesmodels[i].urltitle)
 
 
 def getContentType(image):

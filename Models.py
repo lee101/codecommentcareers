@@ -20,23 +20,6 @@ class JobPosting(ndb.Model):
         return cls.query(cls.urltitle == urltitle).get()
 
     @classmethod
-    def randomOrder(cls, title):
-        ordering = hash(title) % 6
-        if ordering == 0:
-            return cls.query().order(cls.urltitle)
-        if ordering == 1:
-            return cls.query().order(-cls.urltitle)
-        if ordering == 2:
-            return cls.query().order(cls.width)
-        if ordering == 3:
-            return cls.query().order(-cls.width)
-        if ordering == 4:
-            return cls.query().order(cls.height)
-        if ordering == 5:
-            return cls.query().order(-cls.height)
-        return cls.query()
-
-    @classmethod
     def getAllTitles(cls):
         global all_titles
 
