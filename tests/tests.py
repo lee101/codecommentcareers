@@ -50,10 +50,11 @@ class CrawlerTests(unittest.TestCase):
         url = 'https://www.awesomecompanyname.com'
         crawler.process(soup, url)
         job_postings = JobPosting().query().fetch(5)
-        self.assertEqual(len(job_postings), 1)
+        self.assertEqual(len(crawler.postings), 1)
+        job_posting = crawler.postings[0]
 
-        self.assertEqual(set(job_postings.tags), {'html', 'css', 'bootstrap'})
-        self.assertEqual(job_postings.code_comment_url, url)
+        self.assertEqual(set(job_posting.tags), {'html', 'css', 'bootstrap'})
+        self.assertEqual(job_posting.code_comment_url, url)
 
     def test_get_path(self):
         crawler = CodeCommentCrawler()

@@ -244,12 +244,12 @@ class CodeCommentCrawler(Crawler):
                     break
             code_comment = '\n'.join(comments[job_post_start_idx: job_post_end_idx + 1])
 
-            job_posting = JobPosting()
-            job_posting.title = self.getTitle(soup)
-            job_posting.urltitle = awgutils.urlEncode(job_posting.title)
-            job_posting.company_name = self.get_company_name(soup, url)
-            job_posting.company_description = self.getDescription(soup)
+            self.title = self.getTitle(soup)
+            self.urltitle = awgutils.urlEncode(self.title)
+            self.company_name = self.get_company_name(soup, url)
+            self.company_description = self.getDescription(soup)
 
+            job_posting = JobPosting()
             job_posting.company_url = url.replace(self.get_path(url), '')
             job_posting.company_image_url = self.getImage(soup)
             job_posting.code_comment = code_comment
@@ -261,6 +261,11 @@ class CodeCommentCrawler(Crawler):
     def process(self, soup, url):
         posting = self.get_job_posting(soup, url)
         if posting is not None:
+            posting.title = self.title
+            posting.urltitle = self.urltitle
+            posting.company_name = self.company_name
+            posting.company_description = self.company_description
+
             self.postings.append(posting)
 
     def post_process(self):
