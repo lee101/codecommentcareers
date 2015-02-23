@@ -26,23 +26,28 @@ class CrawlerTests(unittest.TestCase):
         crawler.go()
 
     def test_crawler_get_image(self):
+        url = 'http://www.wordsmashing.com'
+
         crawler = Crawler()
         expected_image_url = 'http://img.img/img'
         soup = BeautifulSoup('<html><head><meta name="og:image" content="' + expected_image_url + '"></head></html>')
-        image = crawler.get_image(soup)
+        image = crawler.get_image(soup, url)
         self.assertEqual(image, expected_image_url)
 
         expected_image_url = 'http://img.img/img'
         soup = BeautifulSoup('<html><head><img src="' + expected_image_url + '"></head></html>')
-        image = crawler.get_image(soup)
+        image = crawler.get_image(soup, url)
         self.assertEqual(image, expected_image_url)
 
+        soup = BeautifulSoup('')
+        image = crawler.get_image(soup, url)
+        self.assertEqual(image, '')
 
-        crawler.site_url = 'http://www.wordsmashing.com'
+
         img_url = '/static/img/logo.png'
-        expected_image_url =  crawler.site_url + img_url
+        expected_image_url =  url + img_url
         soup = BeautifulSoup('<html><head><img src="' + img_url + '"></head></html>')
-        image = crawler.get_image(soup)
+        image = crawler.get_image(soup, url)
         self.assertEqual(image, expected_image_url)
 
     def test_crawler_get_description(self):
@@ -55,6 +60,10 @@ class CrawlerTests(unittest.TestCase):
         soup = BeautifulSoup('<html><head><meta name="description" content="' + expected_desc + '"></head></html>')
         desc = crawler.get_description(soup)
         self.assertEqual(desc, expected_desc)
+
+        soup = BeautifulSoup('')
+        desc = crawler.get_description(soup)
+        self.assertEqual(desc, '')
 
 
     def test_get_company_name(self):

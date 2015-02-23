@@ -1,21 +1,21 @@
 from collections import Counter
 import re
 from collections import defaultdict
+import urllib
 import urllib2
-import json
 import logging
 
 import webapp2
 from google.appengine.api import urlfetch
 from google.appengine.api import images
-from google.appengine.ext import deferred
 
 from Models import *
 import awgutils
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup
 import fixtures
-from ws import ws
 import cloudstorage as gcs
+
+
 
 
 
@@ -70,8 +70,39 @@ class Crawler(webapp2.RequestHandler):
     seen_pages_limit = 50000
     seen_domain_pages_limit = 30
 
+    def get_host(self, url):
+        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
+
+    def get_protocol_host(self, url):
+        host =  urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
+        if url.startswith('http://www.'):
+            return 'http://www.' + host
+        if url.startswith('http://'):
+            return 'http://' + host
+        if url.startswith('https://www.'):
+            return 'https://www.' + host
+        if url.startswith('https://'):
+            return 'https://' + host
+
+    def get_path(self, url):
+        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[1]
+
     def get_domain(self, url):
         return urllib2.splithost(url[url.find('://') + 1:])
+
+
+    def full_url_to(self, url, base_path):
+        if not url:
+            return ''
+        if url.startswith('//') | url.startswith('http'):
+            return url
+
+        host = self.get_protocol_host(base_path)
+        path = self.get_path(base_path)
+        path = urllib.splitquery(urllib2.splittag(path)[0])[0]
+        if url.startswith('/'):
+            return host + url
+        return host + path + '/' + url
 
     def bfs(self, current_url):
         '''
@@ -92,7 +123,7 @@ class Crawler(webapp2.RequestHandler):
                 # find new links
                 new_urls = []
                 for link in soup.find_all('a'):
-                    #todo href is not a url
+                    # todo href is not a url
                     new_url = link.get('href')
                     links_host = self.get_domain(new_url)
 
@@ -126,8 +157,8 @@ class Crawler(webapp2.RequestHandler):
                 description = meta_description.get('content')
         return description
 
-    def get_image(self, soup):
-        image_url = None
+    def get_image(self, soup, url):
+        image_url = ''
         try:
             image_url = soup.find('meta', attrs={'name': "og:image"}).get('content')
         except Exception, err:
@@ -137,7 +168,8 @@ class Crawler(webapp2.RequestHandler):
                 image_url = soup.find('img').get('src')
             except AttributeError, err:
                 pass
-        return image_url
+
+        return self.full_url_to(image_url, url)
 
 
     def getTitle(self, soup):
@@ -183,12 +215,6 @@ job_posting_words = defaultdict(int, {
 
 
 class CodeCommentCrawler(Crawler):
-    def get_host(self, url):
-        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
-
-    def get_path(self, url):
-        return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[1]
-
     def is_homepage(self, url):
         return len(self.get_path(url)) <= 1
 
@@ -250,13 +276,14 @@ class CodeCommentCrawler(Crawler):
 
             job_posting = JobPosting()
             job_posting.company_url = url.replace(self.get_path(url), '')
-            job_posting.company_image_url = self.get_image(soup)
+            job_posting.company_image_url = self.get_image(soup, url)
             job_posting.code_comment = code_comment
             job_posting.code_comment_url = url
             job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
             return job_posting
 
     postings = []
+
     def process(self, soup, url):
         posting = self.get_job_posting(soup, url)
         if posting is not None:
@@ -269,8 +296,6 @@ class CodeCommentCrawler(Crawler):
 
     def post_process(self):
         ndb.put_multi(self.postings)
-
-
 
 
 def getContentType(image):
