@@ -4,7 +4,7 @@ from google.appengine.ext import testbed
 
 from Models import JobPosting
 from bs4 import BeautifulSoup
-from crawlers.crawlers import CodeCommentCrawler
+from crawlers.crawlers import CodeCommentCrawler, Crawler
 
 
 class CrawlerTests(unittest.TestCase):
@@ -24,6 +24,38 @@ class CrawlerTests(unittest.TestCase):
         crawler.seen_pages_limit = 20
         crawler.site_url = 'http://localhost:5000'
         crawler.go()
+
+    def test_crawler_get_image(self):
+        crawler = Crawler()
+        expected_image_url = 'http://img.img/img'
+        soup = BeautifulSoup('<html><head><meta name="og:image" content="' + expected_image_url + '"></head></html>')
+        image = crawler.get_image(soup)
+        self.assertEqual(image, expected_image_url)
+
+        expected_image_url = 'http://img.img/img'
+        soup = BeautifulSoup('<html><head><img src="' + expected_image_url + '"></head></html>')
+        image = crawler.get_image(soup)
+        self.assertEqual(image, expected_image_url)
+
+
+        crawler.site_url = 'http://www.wordsmashing.com'
+        img_url = '/static/img/logo.png'
+        expected_image_url =  crawler.site_url + img_url
+        soup = BeautifulSoup('<html><head><img src="' + img_url + '"></head></html>')
+        image = crawler.get_image(soup)
+        self.assertEqual(image, expected_image_url)
+
+    def test_crawler_get_description(self):
+        crawler = Crawler()
+        expected_desc = 'description'
+        soup = BeautifulSoup('<html><head><meta name="og:description" content="' + expected_desc + '"></head></html>')
+        desc = crawler.get_description(soup)
+        self.assertEqual(desc, expected_desc)
+
+        soup = BeautifulSoup('<html><head><meta name="description" content="' + expected_desc + '"></head></html>')
+        desc = crawler.get_description(soup)
+        self.assertEqual(desc, expected_desc)
+
 
     def test_get_company_name(self):
         crawler = CodeCommentCrawler()

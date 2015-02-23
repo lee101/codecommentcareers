@@ -114,10 +114,10 @@ class Crawler(webapp2.RequestHandler):
         self.post_process()
 
 
-    def getDescription(self, soup):
+    def get_description(self, soup):
         description = ''
         try:
-            description = soup.find('meta', attrs={'property': "og:description"}).get('content')
+            description = soup.find('meta', attrs={'name': "og:description"}).get('content')
         except Exception, err:
             pass
         if not description:
@@ -126,10 +126,10 @@ class Crawler(webapp2.RequestHandler):
                 description = meta_description.get('content')
         return description
 
-    def getImage(self, soup):
+    def get_image(self, soup):
         image_url = None
         try:
-            image_url = soup.find('meta', attrs={'property': "og:image"}).get('content')
+            image_url = soup.find('meta', attrs={'name': "og:image"}).get('content')
         except Exception, err:
             pass
         if not image_url:
@@ -179,7 +179,6 @@ job_posting_words = defaultdict(int, {
     'seo': 0.2,
     'hacker': 0.2,
     'coder': 0.2,
-
 })
 
 
@@ -243,15 +242,15 @@ class CodeCommentCrawler(Crawler):
                     job_post_end_idx = i
                     break
             code_comment = '\n'.join(comments[job_post_start_idx: job_post_end_idx + 1])
-
-            self.title = self.getTitle(soup)
-            self.urltitle = awgutils.urlEncode(self.title)
-            self.company_name = self.get_company_name(soup, url)
-            self.company_description = self.getDescription(soup)
+            if self.is_homepage(url):
+                self.title = self.getTitle(soup)
+                self.urltitle = awgutils.urlEncode(self.title)
+                self.company_name = self.get_company_name(soup, url)
+                self.company_description = self.get_description(soup)
 
             job_posting = JobPosting()
             job_posting.company_url = url.replace(self.get_path(url), '')
-            job_posting.company_image_url = self.getImage(soup)
+            job_posting.company_image_url = self.get_image(soup)
             job_posting.code_comment = code_comment
             job_posting.code_comment_url = url
             job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
