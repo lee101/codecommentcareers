@@ -77,7 +77,6 @@ class Crawler(webapp2.RequestHandler):
         '''
         calls process for each page in the site
         '''
-
         try:
             result = urlfetch.fetch(current_url)
 
@@ -112,15 +111,19 @@ class Crawler(webapp2.RequestHandler):
 
     def go(self):
         self.bfs(self.site_url)
+        self.post_process()
+
 
     def getDescription(self, soup):
-        description = False
+        description = ''
         try:
             description = soup.find('meta', attrs={'property': "og:description"}).get('content')
         except Exception, err:
             pass
         if not description:
-            description = soup.find('meta', attrs={'name': "description"}).get('content')
+            meta_description = soup.find('meta', attrs={'name': "description"})
+            if meta_description:
+                description = meta_description.get('content')
         return description
 
     def getImage(self, soup):
@@ -142,6 +145,9 @@ class Crawler(webapp2.RequestHandler):
 
     def is_item(self, soup, current_url):
         return True
+
+    def post_process(self):
+        pass
 
 
 job_posting_words = defaultdict(int, {
@@ -183,6 +189,9 @@ class CodeCommentCrawler(Crawler):
 
     def get_path(self, url):
         return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[1]
+
+    def is_homepage(self, url):
+        return len(self.get_path(url)) <= 1
 
     def get_interesting_level_domain(self, url):
         host = self.get_host(url)
@@ -239,16 +248,23 @@ class CodeCommentCrawler(Crawler):
             job_posting.title = self.getTitle(soup)
             job_posting.urltitle = awgutils.urlEncode(job_posting.title)
             job_posting.company_name = self.get_company_name(soup, url)
+            job_posting.company_description = self.getDescription(soup)
+
             job_posting.company_url = url.replace(self.get_path(url), '')
             job_posting.company_image_url = self.getImage(soup)
             job_posting.code_comment = code_comment
             job_posting.code_comment_url = url
             job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
-            job_posting.put()
+            return job_posting
 
-
+    postings = []
     def process(self, soup, url):
-        self.get_job_posting(soup, url)
+        posting = self.get_job_posting(soup, url)
+        if posting is not None:
+            self.postings.append(posting)
+
+    def post_process(self):
+        ndb.put_multi(self.postings)
 
 
 

@@ -5,6 +5,7 @@ class JobPosting(ndb.Model):
     title = ndb.StringProperty()
     urltitle = ndb.StringProperty()
     company_name = ndb.TextProperty()
+    company_description = ndb.TextProperty()
     company_url = ndb.TextProperty()
     company_image_url = ndb.TextProperty()
     code_comment = ndb.TextProperty()
