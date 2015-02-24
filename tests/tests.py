@@ -108,7 +108,7 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(len(crawler.postings), 2)
         job_posting = crawler.postings[1]
 
-        self.assertEqual(set(job_posting.tags), {'seo', 'css', 'bootstrap'})
+        self.assertEqual(set(job_posting.tags), {'seo'})
         self.assertEqual(job_posting.code_comment_url, url)
 
     def test_get_path(self):

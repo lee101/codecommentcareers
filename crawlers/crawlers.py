@@ -236,7 +236,7 @@ class CodeCommentCrawler(Crawler):
         for comment in comments:
             comments_probability = 0
             for word in re.split(r'[\s\.@]*', comment):
-                comments_probability += job_posting_words[word]
+                comments_probability += job_posting_words[word.lower()]
             total_probability += comments_probability
             comments_probabilitys.append(comments_probability)
         if total_probability > 1:
@@ -262,7 +262,7 @@ class CodeCommentCrawler(Crawler):
             job_posting.company_image_url = self.get_image(soup, url)
             job_posting.code_comment = code_comment
             job_posting.code_comment_url = url
-            job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
+            job_posting.tags = set(re.split(r'\s*', code_comment.lower())).intersection(fixtures.tag_words)
             return job_posting
 
     def __init__(self, **kwargs):
