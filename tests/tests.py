@@ -90,11 +90,25 @@ class CrawlerTests(unittest.TestCase):
         crawler = CodeCommentCrawler()
         url = 'https://www.awesomecompanyname.com'
         crawler.process(soup, url)
-        job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(crawler.postings), 1)
         job_posting = crawler.postings[0]
 
         self.assertEqual(set(job_posting.tags), {'html', 'css', 'bootstrap'})
+        self.assertEqual(job_posting.code_comment_url, url)
+
+        return crawler
+
+    def test_processing_robots(self):
+        with open('tests/tripadvisor_robots.txt') as f:
+            posting = f.read(999999)
+        soup = BeautifulSoup(posting)
+        crawler = self.test_processing_code_comment()
+        url = 'https://www.awesomecompanyname.com/robots.txt'
+        crawler.process(soup, url)
+        self.assertEqual(len(crawler.postings), 2)
+        job_posting = crawler.postings[1]
+
+        self.assertEqual(set(job_posting.tags), {'seo', 'css', 'bootstrap'})
         self.assertEqual(job_posting.code_comment_url, url)
 
     def test_get_path(self):

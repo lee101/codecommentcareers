@@ -1,9 +1,9 @@
 from collections import Counter
 import re
 from collections import defaultdict
-import urllib
 import urllib2
 import logging
+from urlparse import urljoin
 
 import webapp2
 from google.appengine.api import urlfetch
@@ -14,9 +14,6 @@ import awgutils
 from bs4 import BeautifulSoup
 import fixtures
 import cloudstorage as gcs
-
-
-
 
 
 
@@ -73,17 +70,6 @@ class Crawler(webapp2.RequestHandler):
     def get_host(self, url):
         return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
 
-    def get_protocol_host(self, url):
-        host =  urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[0]
-        if url.startswith('http://www.'):
-            return 'http://www.' + host
-        if url.startswith('http://'):
-            return 'http://' + host
-        if url.startswith('https://www.'):
-            return 'https://www.' + host
-        if url.startswith('https://'):
-            return 'https://' + host
-
     def get_path(self, url):
         return urllib2.splithost('//' + re.sub(r'(http://)|(https://)|(www.)', '', url))[1]
 
@@ -94,15 +80,7 @@ class Crawler(webapp2.RequestHandler):
     def full_url_to(self, url, base_path):
         if not url:
             return ''
-        if url.startswith('//') | url.startswith('http'):
-            return url
-
-        host = self.get_protocol_host(base_path)
-        path = self.get_path(base_path)
-        path = urllib.splitquery(urllib2.splittag(path)[0])[0]
-        if url.startswith('/'):
-            return host + url
-        return host + path + '/' + url
+        return urljoin(base_path, url)
 
     def bfs(self, current_url):
         '''
@@ -123,8 +101,11 @@ class Crawler(webapp2.RequestHandler):
                 # find new links
                 new_urls = []
                 for link in soup.find_all('a'):
-                    # todo href is not a url
-                    new_url = link.get('href')
+                    links_href = link.get('href')
+                    if links_href.startswith('#') or links_href.startswith('javascript:'):
+                        continue
+                    new_url = urljoin(current_url, links_href)
+
                     links_host = self.get_domain(new_url)
 
                     # todo improve performance with custom url exclusions
@@ -248,6 +229,8 @@ class CodeCommentCrawler(Crawler):
 
     def get_job_posting(self, soup, url):
         comments = soup.find_all(text=lambda text: text.output_ready().startswith('<!--'))
+        if not comments:
+            comments = soup.find_all(text=lambda text: text.output_ready().startswith('#'))
         total_probability = 0
         comments_probabilitys = []
         for comment in comments:
@@ -282,7 +265,9 @@ class CodeCommentCrawler(Crawler):
             job_posting.tags = set(re.split(r'\s*', code_comment)).intersection(fixtures.tag_words)
             return job_posting
 
-    postings = []
+    def __init__(self, **kwargs):
+        super(CodeCommentCrawler, self).__init__(**kwargs)
+        self.postings = []
 
     def process(self, soup, url):
         posting = self.get_job_posting(soup, url)
