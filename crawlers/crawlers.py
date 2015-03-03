@@ -102,7 +102,8 @@ class Crawler(webapp2.RequestHandler):
                 new_urls = []
                 for link in soup.find_all('a'):
                     links_href = link.get('href')
-                    if links_href.startswith('#') or links_href.startswith('javascript:'):
+                    if links_href.startswith('#') or links_href.startswith('javascript:') or links_href.startswith(
+                            'mailto:'):
                         continue
                     new_url = urljoin(current_url, links_href)
 
