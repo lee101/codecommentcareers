@@ -7,6 +7,7 @@ from google.appengine.datastore.datastore_query import Cursor
 
 from crawlers.crawlers import *
 import awgutils
+from ws import ws
 
 JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
@@ -17,16 +18,6 @@ class BaseHandler(webapp2.RequestHandler):
     def render(self, view_name, extraParams={}):
         template_values = {
             'ws': ws,
-            # 'current_user': currentUser,
-            # 'achievements': achievements,
-            # 'UNLOCKED_MEDIUM':UNLOCKED_MEDIUM,
-            # 'UNLOCKED_HARD':UNLOCKED_HARD,
-            # 'MEDIUM':MEDIUM,
-            # 'EASY':EASY,
-            # 'HARD':HARD,
-            # 'highscores':highscores,
-            # 'glogin_url': users.create_login_url(self.request.uri),
-            # 'glogout_url': users.create_logout_url(self.request.uri),
             'awgutils': awgutils,
             'url': self.request.uri,
         }
