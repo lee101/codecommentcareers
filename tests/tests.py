@@ -111,6 +111,16 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(set(job_posting.tags), {'seo'})
         self.assertEqual(job_posting.code_comment_url, url)
 
+
+    def test_processing_wired_with_no_job(self):
+        with open('tests/wired-no-job-posting.html') as f:
+            posting = f.read(999999)
+        soup = BeautifulSoup(posting)
+        crawler = self.test_processing_code_comment()
+        url = 'https://www.awesomecompanyname.com/science-and-stuff'
+        crawler.process(soup, url)
+        self.assertEqual(len(crawler.postings), 1)
+
     def test_get_path(self):
         crawler = CodeCommentCrawler()
         path = crawler.get_path('http://www.awesomecompanyname.co.nz')

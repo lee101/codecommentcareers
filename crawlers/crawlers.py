@@ -269,6 +269,7 @@ class CodeCommentCrawler(Crawler):
     def __init__(self, **kwargs):
         super(CodeCommentCrawler, self).__init__(**kwargs)
         self.postings = []
+        self.posting_titles = set([])
 
     def process(self, soup, url):
         posting = self.get_job_posting(soup, url)
@@ -277,8 +278,9 @@ class CodeCommentCrawler(Crawler):
             posting.urltitle = self.urltitle
             posting.company_name = self.company_name
             posting.company_description = self.company_description
-
-            self.postings.append(posting)
+            if posting.urltitle not in self.posting_titles:
+                self.posting_titles.add(posting.urltitle)
+                self.postings.append(posting)
 
     def post_process(self):
         ndb.put_multi(self.postings)
