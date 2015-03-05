@@ -343,14 +343,6 @@ def saveUrl(url, title):
         gcs_file.close()
 
 
-def uploadGameThumbTask(url, title):
-    g = Game.oneByUrlTitle(title)
-    g.imgwidth, g.imgheight = saveImage(url, IMG_BUCKET + title)
-    g.put()
-
-
-def uploadGameSWFTask(url, title):
-    saveUrl(url, WORD_GAMES_SWF_BUCKET + title)
 
 
 
