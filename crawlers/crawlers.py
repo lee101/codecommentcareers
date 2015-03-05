@@ -82,7 +82,7 @@ class Crawler(webapp2.RequestHandler):
             return ''
         return urljoin(base_path, url)
 
-    def bfs(self, current_url):
+    def dfs(self, current_url):
         '''
         calls process for each page in the site
         '''
@@ -97,7 +97,12 @@ class Crawler(webapp2.RequestHandler):
 
                 self.seen.add(current_url)
                 host = self.get_domain(current_url)
-                self.seen_domains[host] += 1
+                if self.seen_domains[host] == 0:
+                    # visit homepage of new urls we find.
+                    self.seen_domains[host] += 1
+                    self.dfs(urljoin(current_url, '/'))
+                else:
+                    self.seen_domains[host] += 1
                 # find new links
                 new_urls = []
                 for link in soup.find_all('a'):
@@ -105,6 +110,7 @@ class Crawler(webapp2.RequestHandler):
                     if links_href.startswith('#') or links_href.startswith('javascript:') or links_href.startswith(
                             'mailto:'):
                         continue
+
                     new_url = urljoin(current_url, links_href)
 
                     links_host = self.get_domain(new_url)
@@ -114,16 +120,17 @@ class Crawler(webapp2.RequestHandler):
                                     self.seen_domains[links_host] < self.seen_domain_pages_limit:
                         new_urls.append(new_url)
                 for url in new_urls:
-                    self.bfs(url)
+                    self.dfs(url)
         except Exception, err:
             print Exception, err
+            return
 
 
     def get(self):
         self.go()
 
     def go(self):
-        self.bfs(self.site_url)
+        self.dfs(self.site_url)
         self.post_process()
 
 
@@ -269,7 +276,7 @@ class CodeCommentCrawler(Crawler):
     def __init__(self, **kwargs):
         super(CodeCommentCrawler, self).__init__(**kwargs)
         self.postings = []
-        self.posting_titles = set([])
+        self.postings_tags = set([])
 
     def process(self, soup, url):
         posting = self.get_job_posting(soup, url)
@@ -278,8 +285,9 @@ class CodeCommentCrawler(Crawler):
             posting.urltitle = self.urltitle
             posting.company_name = self.company_name
             posting.company_description = self.company_description
-            if posting.urltitle not in self.posting_titles:
-                self.posting_titles.add(posting.urltitle)
+            new_tags = set(posting.tags).difference(self.postings_tags)
+            if len(new_tags) >= 1:
+                self.postings_tags.update(new_tags)
                 self.postings.append(posting)
 
     def post_process(self):

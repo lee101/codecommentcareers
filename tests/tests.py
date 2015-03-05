@@ -39,6 +39,11 @@ class CrawlerTests(unittest.TestCase):
         image = crawler.get_image(soup, url)
         self.assertEqual(image, expected_image_url)
 
+        expected_image_url = '/img'
+        soup = BeautifulSoup('<html><head><img src="' + expected_image_url + '"><img src="/unimportant.png"></head></html>')
+        image = crawler.get_image(soup, url)
+        self.assertEqual(image, url + expected_image_url)
+
         soup = BeautifulSoup('')
         image = crawler.get_image(soup, url)
         self.assertEqual(image, '')
@@ -95,6 +100,7 @@ class CrawlerTests(unittest.TestCase):
 
         self.assertEqual(set(job_posting.tags), {'html', 'css', 'bootstrap'})
         self.assertEqual(job_posting.code_comment_url, url)
+        self.assertEqual(job_posting.title, 'test title')
 
         return crawler
 
@@ -110,6 +116,10 @@ class CrawlerTests(unittest.TestCase):
 
         self.assertEqual(set(job_posting.tags), {'seo'})
         self.assertEqual(job_posting.code_comment_url, url)
+
+        ## shouldn't add duplicates
+        crawler.process(soup, url)
+        self.assertEqual(len(crawler.postings), 2)
 
 
     def test_processing_wired_with_no_job(self):
