@@ -191,6 +191,7 @@ job_posting_words = defaultdict(int, {
     'bright': 0.2,
     'future': 0.2,
     'hundreds': 0.2,
+    'interest': 0.2,
     'interested': 0.2,
     'global': 0.2,
     'open': 0.2,
