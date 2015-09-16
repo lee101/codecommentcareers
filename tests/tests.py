@@ -157,5 +157,24 @@ class CrawlerTests(unittest.TestCase):
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 1)
 
+    def test_insert_top_1m(self):
+        crawler = CodeCommentCrawler()
+        with open('tests/top-1m.csv') as f:
+            line = f.readline()
+            while line:
+                rank, domain = line.split(',')
+
+                def callback(result):
+                    if result.status_code == 200:
+                        soup = BeautifulSoup(result.content)
+                        crawler.process(soup)
+                        crawler.post_process(soup)
+
+                crawler.getUrl('http://' + domain, callback)
+
+
+        job_postings = JobPosting().query().fetch(5)
+        self.assertEqual(len(job_postings), 5)
+
 
 

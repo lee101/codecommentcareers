@@ -293,6 +293,8 @@ class CodeCommentCrawler(Crawler):
 
     def post_process(self):
         ndb.put_multi(self.postings)
+        self.postings = []
+        self.postings_tags = set([])
 
 
 def getContentType(image):
