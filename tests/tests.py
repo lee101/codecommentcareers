@@ -168,7 +168,7 @@ class CrawlerTests(unittest.TestCase):
                     if result.status_code == 200:
                         soup = BeautifulSoup(result.content)
                         crawler.process(soup)
-                        crawler.post_process(soup)
+                        crawler.post_process()
 
                 crawler.getUrl('http://' + domain, callback)
 
