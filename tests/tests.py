@@ -185,7 +185,7 @@ class CrawlerTests(unittest.TestCase):
                         else:
                             print 'no results for ' + str(rank)
 
-                deferred.defer(process, rank, url)
+                deferred.defer(process, rank, url, _queue='background-processing')
 
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 5)
