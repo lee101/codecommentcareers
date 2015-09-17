@@ -30,14 +30,6 @@ handlers:
 - url: /mochi.html
   static_files: mochi.html
   upload: mochi.html
-- url: /achievement-hard.html
-  static_files: achievement-hard.html
-  upload: achievement-hard.html
-  expiration: "0d 1h"
-- url: /achievement-medium.html
-  static_files: achievement-medium.html
-  upload: achievement-medium.html
-  expiration: "0d 1h"
 - url: .*
   script: main.app
 
