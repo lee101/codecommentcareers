@@ -107,7 +107,7 @@ class Crawler(webapp2.RequestHandler):
                 new_urls = []
                 for link in soup.find_all('a'):
                     links_href = link.get('href')
-                    if links_href.startswith('#') or links_href.startswith('javascript:') or links_href.startswith(
+                    if not links_href or links_href.startswith('#') or links_href.startswith('javascript:') or links_href.startswith(
                             'mailto:'):
                         continue
 
@@ -122,7 +122,7 @@ class Crawler(webapp2.RequestHandler):
                 for url in new_urls:
                     self.dfs(url)
         except Exception, err:
-            print Exception, err
+            print err
             return
 
 

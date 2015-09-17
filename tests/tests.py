@@ -1,7 +1,10 @@
 import unittest
-from flask import json
 
+from flask import json
+from google.appengine.api import urlfetch
 from google.appengine.ext import testbed
+
+from google.appengine.api.urlfetch_errors import DeadlineExceededError
 
 from Models import JobPosting
 from bs4 import BeautifulSoup
@@ -21,11 +24,11 @@ class CrawlerTests(unittest.TestCase):
     def tearDown(self):
         self.testbed.deactivate()
 
-    def test_crawler(self):
-        crawler = CodeCommentCrawler()
-        crawler.seen_pages_limit = 20
-        crawler.site_url = 'http://localhost:5000'
-        crawler.go()
+    # def test_crawler(self):
+    #     crawler = CodeCommentCrawler()
+    #     crawler.seen_pages_limit = 20
+    #     crawler.site_url = 'http://localhost:5000'
+    #     crawler.go()
 
     def test_crawler_get_image(self):
         url = 'http://www.wordsmashing.com'
@@ -42,7 +45,8 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(image, expected_image_url)
 
         expected_image_url = '/img'
-        soup = BeautifulSoup('<html><head><img src="' + expected_image_url + '"><img src="/unimportant.png"></head></html>')
+        soup = BeautifulSoup(
+            '<html><head><img src="' + expected_image_url + '"><img src="/unimportant.png"></head></html>')
         image = crawler.get_image(soup, url)
         self.assertEqual(image, url + expected_image_url)
 
@@ -50,9 +54,8 @@ class CrawlerTests(unittest.TestCase):
         image = crawler.get_image(soup, url)
         self.assertEqual(image, '')
 
-
         img_url = '/static/img/logo.png'
-        expected_image_url =  url + img_url
+        expected_image_url = url + img_url
         soup = BeautifulSoup('<html><head><img src="' + img_url + '"></head></html>')
         image = crawler.get_image(soup, url)
         self.assertEqual(image, expected_image_url)
@@ -72,7 +75,6 @@ class CrawlerTests(unittest.TestCase):
         desc = crawler.get_description(soup)
         self.assertEqual(desc, '')
 
-
     def test_get_company_name(self):
         crawler = CodeCommentCrawler()
         soup = BeautifulSoup('<html><head><title>awesome company name</title></head></html>')
@@ -88,7 +90,6 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(company_name, 'Awesome Company Name')
         company_name = crawler.get_company_name(soup, 'http://www.awesomecompanyname.co.nz')
         self.assertEqual(company_name, 'Awesome Company Name')
-
 
     def test_processing_code_comment(self):
         with open('tests/test_job_posting.html') as f:
@@ -122,7 +123,6 @@ class CrawlerTests(unittest.TestCase):
         ## shouldn't add duplicates
         crawler.process(soup, url)
         self.assertEqual(len(crawler.postings), 2)
-
 
     def test_processing_wired_with_no_job(self):
         with open('tests/wired-no-job-posting.html') as f:
@@ -162,26 +162,24 @@ class CrawlerTests(unittest.TestCase):
     def test_insert_top_1m(self):
         crawler = CodeCommentCrawler()
         with open('tests/top-1m.csv') as f:
-            line = f.readline()
-            while line:
+            for line in f:
                 rank, domain = line.split(',')
+                domain = domain[0: -1]
                 url = 'http://' + domain
 
-                def callback(result):
-                    if result.status_code == 200:
-                        soup = BeautifulSoup(result.content)
-                        crawler.process(soup, url)
+                try:
+                    result = urlfetch.fetch(url)
+                except DeadlineExceededError, e:
+                    continue
+                if result.status_code == 200:
+                    soup = BeautifulSoup(result.content)
+                    crawler.process(soup, url)
+                    if len(crawler.postings):
                         posting = crawler.postings[0]
                         posting.rank = rank
                         print json.dumps(posting.to_dict())
 
-                        crawler.post_process()
-
-                crawler.getUrl(url, callback)
-
+                    crawler.post_process()
 
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 5)
-
-
-
