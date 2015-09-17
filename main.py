@@ -2,8 +2,13 @@
 
 import os
 
+from google.appengine.api.urlfetch_errors import DeadlineExceededError
+from google.appengine.ext import deferred
 import jinja2
 from google.appengine.datastore.datastore_query import Cursor
+
+from google.appengine.api import urlfetch
+import logging
 
 from crawlers.crawlers import *
 import awgutils
@@ -26,6 +31,7 @@ class BaseHandler(webapp2.RequestHandler):
         template = JINJA_ENVIRONMENT.get_template(view_name)
         self.response.write(template.render(template_values))
 
+
 class MainHandler(BaseHandler):
     def get(self):
         curs = Cursor(urlsafe=self.request.get('cursor'))
@@ -38,7 +44,6 @@ class MainHandler(BaseHandler):
         extraParams = {'job_postings': job_postings,
                        'next_page_cursor': next_page_cursor}
         self.render('/templates/index.jinja2', extraParams)
-
 
 
 class ContactHandler(BaseHandler):
@@ -131,11 +136,32 @@ class TagHandler(BaseHandler):
         self.render('/templates/tag.jinja2', extraParams)
 
 
+def process(rank, url):
+    crawler = CodeCommentCrawler()
+
+    try:
+        result = urlfetch.fetch(url, deadline=5)
+    except DeadlineExceededError, e:
+        logging.error(e)
+        return
+    if result.status_code == 200:
+        soup = BeautifulSoup(result.content)
+        crawler.process(soup, url)
+        if len(crawler.postings):
+            posting = crawler.postings[0]
+            posting.rank = int(rank)
+            crawler.post_process()
+        else:
+            print 'no results for ' + str(rank)
+
 class TestHandler(BaseHandler):
     def get(self):
-        test_crawler = CodeCommentCrawler()
-        test_crawler.site_url = 'http://localhost:5000'
-        test_crawler.go()
+        with open('tests/top-1m.csv') as f:
+            for line in f:
+                rank, domain = line.split(',')
+                domain = domain[0: -1]
+                url = 'http://' + domain
+                deferred.defer(process, rank, url, _queue='background-processing')
 
 
 class LogoutHandler(BaseHandler):
@@ -144,6 +170,7 @@ class LogoutHandler(BaseHandler):
             self.session['user'] = None
 
         self.redirect('/')
+
 
 # class Thumbnailer(webapp2.RequestHandler):
 # def get(self, title):
@@ -166,17 +193,16 @@ class LogoutHandler(BaseHandler):
 
 
 app = ndb.toplevel(webapp2.WSGIApplication([
-                                               ('/', MainHandler),
-                                               ('/logout', LogoutHandler),
-                                               ('/privacy-policy', PrivacyHandler),
-                                               ('/terms', TermsHandler),
-                                               ('/about', AboutHandler),
-                                               ('/contact', ContactHandler),
-                                               ('/job/(.*)', GameHandler),
-                                               ('/jobs/(.*)', TagHandler),
-                                               ('/gotest', TestHandler),
-                                               ('/loadjob_postings', LoadGamesHandler),
-                                               ('/sitemap', SitemapHandler),
+    ('/', MainHandler),
+    ('/logout', LogoutHandler),
+    ('/privacy-policy', PrivacyHandler),
+    ('/terms', TermsHandler),
+    ('/about', AboutHandler),
+    ('/contact', ContactHandler),
+    ('/job/(.*)', GameHandler),
+    ('/jobs/(.*)', TagHandler),
+    ('/gotest', TestHandler),
+    ('/loadjob_postings', LoadGamesHandler),
+    ('/sitemap', SitemapHandler),
 
-
-                                           ], debug=ws.debug))
+], debug=ws.debug))

@@ -1,17 +1,10 @@
 import unittest
 
-from flask import json
-from google.appengine.api import urlfetch
 from google.appengine.ext import testbed
-
-from google.appengine.api.urlfetch_errors import DeadlineExceededError
-from google.appengine.ext import deferred
 
 from Models import JobPosting
 from bs4 import BeautifulSoup
 from crawlers.crawlers import CodeCommentCrawler, Crawler
-
-from multiprocessing import Pool
 
 
 class CrawlerTests(unittest.TestCase):
@@ -27,11 +20,11 @@ class CrawlerTests(unittest.TestCase):
     def tearDown(self):
         self.testbed.deactivate()
 
-    # def test_crawler(self):
-    #     crawler = CodeCommentCrawler()
-    #     crawler.seen_pages_limit = 20
-    #     crawler.site_url = 'http://localhost:5000'
-    #     crawler.go()
+    def test_crawler(self):
+        crawler = CodeCommentCrawler()
+        crawler.seen_pages_limit = 20
+        crawler.site_url = 'http://localhost:5000'
+        crawler.go()
 
     def test_crawler_get_image(self):
         url = 'http://www.wordsmashing.com'
@@ -162,30 +155,3 @@ class CrawlerTests(unittest.TestCase):
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 1)
 
-    def test_insert_top_1m(self):
-        crawler = CodeCommentCrawler()
-        with open('tests/top-1m.csv') as f:
-            for line in f:
-                rank, domain = line.split(',')
-                domain = domain[0: -1]
-                url = 'http://' + domain
-                def process(rank, url):
-                    try:
-                        result = urlfetch.fetch(url, deadline=5)
-                    except DeadlineExceededError, e:
-                        return
-                    if result.status_code == 200:
-                        soup = BeautifulSoup(result.content)
-                        crawler.process(soup, url)
-                        if len(crawler.postings):
-                            posting = crawler.postings[0]
-                            posting.rank = int(rank)
-                            crawler.post_process()
-                            print json.dumps(posting.to_dict())
-                        else:
-                            print 'no results for ' + str(rank)
-
-                deferred.defer(process, rank, url, _queue='background-processing')
-
-        job_postings = JobPosting().query().fetch(5)
-        self.assertEqual(len(job_postings), 5)
