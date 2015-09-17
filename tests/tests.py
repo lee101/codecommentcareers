@@ -1,4 +1,5 @@
 import unittest
+from flask import json
 
 from google.appengine.ext import testbed
 
@@ -14,6 +15,7 @@ class CrawlerTests(unittest.TestCase):
         self.testbed.init_datastore_v3_stub()
         self.testbed.init_memcache_stub()
         self.testbed.init_taskqueue_stub()
+        self.testbed.init_urlfetch_stub()
         self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
 
     def tearDown(self):
@@ -163,14 +165,19 @@ class CrawlerTests(unittest.TestCase):
             line = f.readline()
             while line:
                 rank, domain = line.split(',')
+                url = 'http://' + domain
 
                 def callback(result):
                     if result.status_code == 200:
                         soup = BeautifulSoup(result.content)
-                        crawler.process(soup)
+                        crawler.process(soup, url)
+                        posting = crawler.postings[0]
+                        posting.rank = rank
+                        print json.dumps(posting.to_dict())
+
                         crawler.post_process()
 
-                crawler.getUrl('http://' + domain, callback)
+                crawler.getUrl(url, callback)
 
 
         job_postings = JobPosting().query().fetch(5)

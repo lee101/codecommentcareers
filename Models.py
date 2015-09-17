@@ -10,6 +10,7 @@ class JobPosting(ndb.Model):
     company_image_url = ndb.TextProperty()
     code_comment = ndb.TextProperty()
     code_comment_url = ndb.TextProperty()
+    rank = ndb.IntegerProperty()
     tags = ndb.StringProperty(repeated=True)
 
     @classmethod
