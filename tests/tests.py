@@ -176,8 +176,10 @@ class CrawlerTests(unittest.TestCase):
                     crawler.process(soup, url)
                     if len(crawler.postings):
                         posting = crawler.postings[0]
-                        posting.rank = rank
+                        posting.rank = int(rank)
                         print json.dumps(posting.to_dict())
+                    else:
+                        print 'no results for ' + str(rank) + domain
 
                     crawler.post_process()
 
