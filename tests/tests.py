@@ -10,6 +10,8 @@ from Models import JobPosting
 from bs4 import BeautifulSoup
 from crawlers.crawlers import CodeCommentCrawler, Crawler
 
+from multiprocessing import Pool
+
 
 class CrawlerTests(unittest.TestCase):
     def setUp(self):
@@ -161,27 +163,30 @@ class CrawlerTests(unittest.TestCase):
 
     def test_insert_top_1m(self):
         crawler = CodeCommentCrawler()
+        num_processes = 8
+        worker_pool = Pool(processes=num_processes)
         with open('tests/top-1m.csv') as f:
             for line in f:
                 rank, domain = line.split(',')
                 domain = domain[0: -1]
                 url = 'http://' + domain
-
-                try:
-                    result = urlfetch.fetch(url)
-                except DeadlineExceededError, e:
-                    continue
-                if result.status_code == 200:
-                    soup = BeautifulSoup(result.content)
-                    crawler.process(soup, url)
-                    if len(crawler.postings):
-                        posting = crawler.postings[0]
-                        posting.rank = int(rank)
-                        print json.dumps(posting.to_dict())
-                    else:
-                        print 'no results for ' + str(rank) + domain
+                def process(rank, url):
+                    try:
+                        result = urlfetch.fetch(url, deadline=5)
+                    except DeadlineExceededError, e:
+                        return
+                    if result.status_code == 200:
+                        soup = BeautifulSoup(result.content)
+                        crawler.process(soup, url)
+                        if len(crawler.postings):
+                            posting = crawler.postings[0]
+                            posting.rank = int(rank)
+                            print json.dumps(posting.to_dict())
+                        else:
+                            print 'no results for ' + str(rank) + url
 
                     crawler.post_process()
+                worker_pool.apply_async(process, [rank, url])
 
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 5)
