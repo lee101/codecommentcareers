@@ -5,6 +5,7 @@ from google.appengine.api import urlfetch
 from google.appengine.ext import testbed
 
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
+from google.appengine.ext import deferred
 
 from Models import JobPosting
 from bs4 import BeautifulSoup
@@ -163,8 +164,6 @@ class CrawlerTests(unittest.TestCase):
 
     def test_insert_top_1m(self):
         crawler = CodeCommentCrawler()
-        num_processes = 8
-        worker_pool = Pool(processes=num_processes)
         with open('tests/top-1m.csv') as f:
             for line in f:
                 rank, domain = line.split(',')
@@ -181,12 +180,12 @@ class CrawlerTests(unittest.TestCase):
                         if len(crawler.postings):
                             posting = crawler.postings[0]
                             posting.rank = int(rank)
+                            crawler.post_process()
                             print json.dumps(posting.to_dict())
                         else:
-                            print 'no results for ' + str(rank) + url
+                            print 'no results for ' + str(rank)
 
-                    crawler.post_process()
-                worker_pool.apply_async(process, [rank, url])
+                deferred.defer(process, rank, url)
 
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 5)
