@@ -156,12 +156,17 @@ def process(rank, url):
 
 class TestHandler(BaseHandler):
     def get(self):
+        times = 0
         with open('tests/top-1m.csv') as f:
             for line in f:
                 rank, domain = line.split(',')
                 domain = domain[0: -1]
                 url = 'http://' + domain
                 deferred.defer(process, rank, url, _queue='background-processing')
+                times += 1
+                if times == 50000:
+                    break
+        logging.log("SUCCESS queueing tasks")
 
 
 class LogoutHandler(BaseHandler):
