@@ -1,4 +1,5 @@
 import unittest
+from google.appengine.api import urlfetch
 
 from google.appengine.ext import testbed
 
@@ -20,11 +21,11 @@ class CrawlerTests(unittest.TestCase):
     def tearDown(self):
         self.testbed.deactivate()
 
-    def test_crawler(self):
-        crawler = CodeCommentCrawler()
-        crawler.seen_pages_limit = 20
-        crawler.site_url = 'http://localhost:5000'
-        crawler.go()
+    # def test_crawler(self):
+    #     crawler = CodeCommentCrawler()
+    #     crawler.seen_pages_limit = 20
+    #     crawler.site_url = 'http://localhost:5000'
+    #     crawler.go()
 
     def test_crawler_get_image(self):
         url = 'http://www.wordsmashing.com'
@@ -116,9 +117,9 @@ class CrawlerTests(unittest.TestCase):
         self.assertEqual(set(job_posting.tags), {'seo'})
         self.assertEqual(job_posting.code_comment_url, url)
 
-        ## shouldn't add duplicates
-        crawler.process(soup, url)
-        self.assertEqual(len(crawler.postings), 2)
+        ## shouldn't add duplicates, but we don't care anymore as we are using shallow scan of top 1m
+        # crawler.process(soup, url)
+        # self.assertEqual(len(crawler.postings), 2)
 
     def test_processing_wired_with_no_job(self):
         with open('tests/wired-no-job-posting.html') as f:
@@ -155,3 +156,16 @@ class CrawlerTests(unittest.TestCase):
         job_postings = JobPosting().query().fetch(5)
         self.assertEqual(len(job_postings), 1)
 
+    def test_mozilla(self):
+        crawler = CodeCommentCrawler()
+        url = 'http://mozilla.org'
+        result = urlfetch.fetch(url, deadline=5)
+        posting = {}
+        if result.status_code == 200:
+            soup = BeautifulSoup(result.content)
+            crawler.process(soup, url)
+            if len(crawler.postings):
+                posting = crawler.postings[0]
+                posting.rank = 1
+                crawler.post_process()
+        self.assertTrue(posting.rank == 1)

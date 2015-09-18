@@ -7,6 +7,7 @@ from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import deferred
 import jinja2
 from google.appengine.datastore.datastore_query import Cursor
+from google.appengine.api import runtime
 
 from google.appengine.api import urlfetch
 import logging
@@ -155,19 +156,34 @@ def process(rank, url):
         else:
             print 'no results for ' + str(rank)
 
+
+def queue_proccess_domain_tasks(start=0):
+    current_line = 0
+    with open('tests/top-1m.csv') as f:
+        for line in f:
+            if current_line < start:
+                current_line += 1
+                continue
+
+            rank, domain = line.split(',')
+            domain = domain[0: -1]
+            url = 'http://' + domain
+            deferred.defer(process, rank, url, _queue='background-processing')
+            current_line += 1
+            time.sleep(1)
+            if runtime.is_shutting_down():
+                deferred.defer(queue_proccess_domain_tasks, current_line)
+                logging.error("We are getting shutdown D:")
+                return
+
+
+    logging.log("SUCCESS queueing tasks")
+
 class TestHandler(BaseHandler):
     def get(self):
-        def background_func():
-            with open('tests/top-1m.csv') as f:
-                for line in f:
-                    rank, domain = line.split(',')
-                    domain = domain[0: -1]
-                    url = 'http://' + domain
-                    deferred.defer(process, rank, url, _queue='background-processing')
-                    time.sleep(1)
-            logging.log("SUCCESS queueing tasks")
 
-        t = background_thread.BackgroundThread(target=background_func)
+
+        t = background_thread.BackgroundThread(target=queue_proccess_domain_tasks)
         t.start()
 
 

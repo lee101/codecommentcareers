@@ -286,10 +286,9 @@ class CodeCommentCrawler(Crawler):
             posting.urltitle = self.urltitle
             posting.company_name = self.company_name
             posting.company_description = self.company_description
-            new_tags = set(posting.tags).difference(self.postings_tags)
-            if len(new_tags) >= 1:
-                self.postings_tags.update(new_tags)
-                self.postings.append(posting)
+
+            self.postings_tags.update(posting.tags)
+            self.postings.append(posting)
 
     def post_process(self):
         ndb.put_multi(self.postings)
