@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-
+import time
 import os
+from google.appengine.api.background_thread import background_thread
 
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import deferred
@@ -156,17 +157,18 @@ def process(rank, url):
 
 class TestHandler(BaseHandler):
     def get(self):
-        times = 0
-        with open('tests/top-1m.csv') as f:
-            for line in f:
-                rank, domain = line.split(',')
-                domain = domain[0: -1]
-                url = 'http://' + domain
-                deferred.defer(process, rank, url, _queue='background-processing')
-                times += 1
-                if times == 50000:
-                    break
-        logging.log("SUCCESS queueing tasks")
+        def background_func():
+            with open('tests/top-1m.csv') as f:
+                for line in f:
+                    rank, domain = line.split(',')
+                    domain = domain[0: -1]
+                    url = 'http://' + domain
+                    deferred.defer(process, rank, url, _queue='background-processing')
+                    time.sleep(1)
+            logging.log("SUCCESS queueing tasks")
+
+        t = background_thread.BackgroundThread(target=background_func)
+        t.start()
 
 
 class LogoutHandler(BaseHandler):
